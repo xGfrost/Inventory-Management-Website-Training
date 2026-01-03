@@ -1,3 +1,4 @@
+import ProductsChart from "@/components/products-charts";
 import SideBar from "@/components/sidebar";
 import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -19,26 +20,49 @@ export default async function DashboardPage() {
       },
     }),
     prisma.product.findMany({
-    where: { userId },
-    select: {
-      price: true,
-      quantity: true,
-      createdAt: true,
-    },
-  })
+      where: { userId },
+      select: {
+        price: true,
+        quantity: true,
+        createdAt: true,
+      },
+    }),
   ]);
 
   const totalValue = allProducts.reduce(
     (sum, product) => sum + Number(product.price) * Number(product.quantity),
     0
   );
-  console.log("🚀 ~ DashboardPage ~ totalValue:", totalValue)
+
+  const now = new Date();
+  const weeklyProductData = [];
+
+  for (let i = 11; i >= 0; i--) {
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - i * 7);
+    weekStart.setHours(0, 0, 0, 0);
+
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    weekStart.setHours(23, 59, 59, 999);
+
+    const weekLabel = `${String(weekStart.getMonth() + 1).padStart(2, "0")}/${String(weekStart.getDate() + 1).padStart(2, "0")}`;
+
+    const weekProducts = allProducts.filter((product) => {
+      const productDate = new Date(product.createdAt);
+      return productDate >= weekStart && productDate <= weekEnd;
+    });
+    weeklyProductData.push({
+      week: weekLabel,
+      products: weekProducts.length,
+    });
+  }
 
   const recent = await prisma.product.findMany({
-    where: {userId},
-    orderBy: {createdAt: "desc"},
-    take: 5
-  })
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -58,7 +82,6 @@ export default async function DashboardPage() {
           </div>
         </div>
 
-        
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* key metrics */}
           <div className="bg-white rounded-lg border border-gray-200 p-6">
@@ -104,12 +127,68 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+
+          {/* Inventory over time */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2>New products per week</h2>
+            </div>
+          </div>
+          <div className="h-48">
+            <ProductsChart data={weeklyProductData} />
+          </div>
         </div>
 
-
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            {/*Stock Level */}
+          {/*Stock Level */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Stock Level
+              </h2>
+            </div>
+            <div className="space-y-3">
+              {recent.map((product, key) => {
+                const stocklevel =
+                  product.quantity === 0
+                    ? 0
+                    : product.quantity <= (product.lowStockAt || 5)
+                      ? 1
+                      : 2;
 
+                const bgColors = [
+                  "bg-red-600",
+                  "bg-yellow-600",
+                  "bg-green-600",
+                ];
+                const textColors = [
+                  "bg-red-600",
+                  "bg-yellow-600",
+                  "bg-green-600",
+                ];
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between p-3 rounded-lg bg-gray-50"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div
+                        className={`w-3 h-3 rounded-full ${bgColors[stocklevel]}`}
+                      />
+                      <span className="text-sm font-medium text-gray-900">
+                        {product.name}
+                      </span>
+                    </div>
+                    <div
+                      className={`text-sm font-medium ${textColors[stocklevel]}`}
+                    >
+                      {product.quantity} units
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </main>
     </div>
