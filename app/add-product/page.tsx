@@ -1,3 +1,4 @@
+
 import Sidebar from "@/components/sidebar";
 import { createProduct } from "@/lib/actions/products";
 import { getCurrentUser } from "@/lib/auth";
